@@ -1,0 +1,86 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+
+interface DeleteApplicationButtonProps {
+  applicationId: string
+  applicationTitle: string
+}
+
+export function DeleteApplicationButton({
+  applicationId,
+  applicationTitle,
+}: DeleteApplicationButtonProps) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [pending, setPending] = useState(false)
+
+  async function handleDelete() {
+    setPending(true)
+    try {
+      const res = await fetch(`/api/applications/${applicationId}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Errore eliminazione' }))
+        toast.error(error ?? 'Errore eliminazione')
+        setPending(false)
+        return
+      }
+      toast.success('Candidatura eliminata')
+      setOpen(false)
+      router.push('/applications')
+      router.refresh()
+    } catch {
+      toast.error('Errore eliminazione')
+      setPending(false)
+    }
+  }
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger
+        render={<Button variant="outline" size="icon" aria-label="Elimina candidatura" />}
+      >
+        <Trash2 className="size-4 text-destructive" />
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Eliminare questa candidatura?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Stai per eliminare <strong>{applicationTitle}</strong>. Verranno cancellate
+            anche tutte le note associate. L&apos;azione non è reversibile.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>Annulla</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => {
+              e.preventDefault()
+              handleDelete()
+            }}
+            disabled={pending}
+            className="bg-destructive text-white hover:bg-destructive/90"
+          >
+            {pending ? 'Elimino…' : 'Elimina'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}

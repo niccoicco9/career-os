@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { MatchScoreCard } from '@/components/features/match-score-card'
 import { NotesSection } from '@/components/features/notes-section'
 import { StatusSelect } from '@/components/features/status-select'
+import { DeleteApplicationButton } from '@/components/features/delete-application-button'
 import { STATUS_LABELS, STATUS_COLORS, type MatchAnalysis } from '@/types'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
@@ -20,13 +21,13 @@ export default async function ApplicationDetailPage({
   const { id } = await params
   const supabase = await createClient()
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
 
-  if (!user) return null
+  if (!session) return null
 
   const application = await prisma.application.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: session!.user.id },
     include: { jobPosting: true, resume: true, notes: { orderBy: { createdAt: 'desc' } } },
   })
 
@@ -65,7 +66,13 @@ export default async function ApplicationDetailPage({
           </div>
         </div>
 
-        <StatusSelect applicationId={application.id} currentStatus={application.status} />
+        <div className="flex items-center gap-2">
+          <StatusSelect applicationId={application.id} currentStatus={application.status} />
+          <DeleteApplicationButton
+            applicationId={application.id}
+            applicationTitle={jobPosting.title}
+          />
+        </div>
       </div>
 
       {analysis && <MatchScoreCard analysis={analysis} />}

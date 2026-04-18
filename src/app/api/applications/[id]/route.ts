@@ -43,3 +43,27 @@ export async function PATCH(
 
   return NextResponse.json(updated)
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
+  }
+
+  const application = await prisma.application.findFirst({
+    where: { id, userId: user.id },
+  })
+
+  if (!application) {
+    return NextResponse.json({ error: 'Non trovato' }, { status: 404 })
+  }
+
+  await prisma.application.delete({ where: { id } })
+  return new NextResponse(null, { status: 204 })
+}
