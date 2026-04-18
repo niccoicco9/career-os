@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import {
   Select,
@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select'
 import type { ApplicationStatus } from '@/types'
 import { STATUS_LABELS } from '@/lib/status'
+import { updateApplicationStatus } from '@/app/(dashboard)/applications/actions'
 
 interface StatusSelectProps {
   applicationId: string
@@ -21,31 +22,21 @@ const statuses = Object.keys(STATUS_LABELS) as ApplicationStatus[]
 
 export function StatusSelect({ applicationId, currentStatus }: StatusSelectProps) {
   const [status, setStatus] = useState<ApplicationStatus>(currentStatus)
-  const [pending, setPending] = useState(false)
+  const [pending, startTransition] = useTransition()
 
-  async function handleChange(next: string | null) {
+  function handleChange(next: string | null) {
     if (!next) return
     const prev = status
-    setStatus(next as ApplicationStatus)
-    setPending(true)
-
-    try {
-      const res = await fetch(`/api/applications/${applicationId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: next }),
-      })
-
-      if (!res.ok) {
+    const nextStatus = next as ApplicationStatus
+    setStatus(nextStatus)
+    startTransition(async () => {
+      try {
+        await updateApplicationStatus(applicationId, nextStatus)
+      } catch {
         setStatus(prev)
         toast.error('Errore aggiornamento stato')
       }
-    } catch {
-      setStatus(prev)
-      toast.error('Errore aggiornamento stato')
-    } finally {
-      setPending(false)
-    }
+    })
   }
 
   return (

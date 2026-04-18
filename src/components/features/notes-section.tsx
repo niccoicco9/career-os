@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -9,6 +9,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { it } from 'date-fns/locale'
 import type { Note } from '@/generated/prisma/client'
 import { Plus, Loader2 } from 'lucide-react'
+import { createNote } from '@/app/(dashboard)/applications/actions'
 
 interface NotesSectionProps {
   applicationId: string
@@ -18,26 +19,20 @@ interface NotesSectionProps {
 export function NotesSection({ applicationId, initialNotes }: NotesSectionProps) {
   const [notes, setNotes] = useState(initialNotes)
   const [text, setText] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [saving, startTransition] = useTransition()
 
-  async function addNote() {
-    if (!text.trim()) return
-    setSaving(true)
-
-    const res = await fetch(`/api/applications/${applicationId}/notes`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: text.trim() }),
+  function addNote() {
+    const content = text.trim()
+    if (!content) return
+    startTransition(async () => {
+      try {
+        const note = await createNote(applicationId, content)
+        setNotes((prev) => [note, ...prev])
+        setText('')
+      } catch {
+        toast.error('Errore salvataggio nota')
+      }
     })
-
-    if (!res.ok) {
-      toast.error('Errore salvataggio nota')
-    } else {
-      const note = await res.json()
-      setNotes([note, ...notes])
-      setText('')
-    }
-    setSaving(false)
   }
 
   return (

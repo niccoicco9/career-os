@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -16,6 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { deleteApplication } from '@/app/(dashboard)/applications/actions'
 
 interface DeleteApplicationButtonProps {
   applicationId: string
@@ -26,30 +26,17 @@ export function DeleteApplicationButton({
   applicationId,
   applicationTitle,
 }: DeleteApplicationButtonProps) {
-  const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [pending, setPending] = useState(false)
+  const [pending, startTransition] = useTransition()
 
-  async function handleDelete() {
-    setPending(true)
-    try {
-      const res = await fetch(`/api/applications/${applicationId}`, {
-        method: 'DELETE',
-      })
-      if (!res.ok) {
-        const { error } = await res.json().catch(() => ({ error: 'Errore eliminazione' }))
-        toast.error(error ?? 'Errore eliminazione')
-        setPending(false)
-        return
+  function handleDelete() {
+    startTransition(async () => {
+      try {
+        await deleteApplication(applicationId)
+      } catch {
+        toast.error('Errore eliminazione')
       }
-      toast.success('Candidatura eliminata')
-      setOpen(false)
-      router.push('/applications')
-      router.refresh()
-    } catch {
-      toast.error('Errore eliminazione')
-      setPending(false)
-    }
+    })
   }
 
   return (
