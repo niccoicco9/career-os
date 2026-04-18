@@ -13,40 +13,42 @@ import { STATUS_LABELS, type ApplicationStatus } from '@/types'
 
 interface StatusSelectProps {
   applicationId: string
-  currentStatus: string
+  currentStatus: ApplicationStatus
 }
 
-const statuses: ApplicationStatus[] = [
-  'SAVED',
-  'APPLIED',
-  'SCREENING',
-  'INTERVIEW',
-  'OFFER',
-  'REJECTED',
-]
+const statuses = Object.keys(STATUS_LABELS) as ApplicationStatus[]
 
 export function StatusSelect({ applicationId, currentStatus }: StatusSelectProps) {
-  const [status, setStatus] = useState(currentStatus)
+  const [status, setStatus] = useState<ApplicationStatus>(currentStatus)
+  const [pending, setPending] = useState(false)
 
-  async function handleChange(newStatus: string | null) {
-    if (!newStatus) return
+  async function handleChange(next: string | null) {
+    if (!next) return
     const prev = status
-    setStatus(newStatus)
+    setStatus(next as ApplicationStatus)
+    setPending(true)
 
-    const res = await fetch(`/api/applications/${applicationId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    })
+    try {
+      const res = await fetch(`/api/applications/${applicationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: next }),
+      })
 
-    if (!res.ok) {
+      if (!res.ok) {
+        setStatus(prev)
+        toast.error('Errore aggiornamento stato')
+      }
+    } catch {
       setStatus(prev)
       toast.error('Errore aggiornamento stato')
+    } finally {
+      setPending(false)
     }
   }
 
   return (
-    <Select value={status} onValueChange={handleChange}>
+    <Select value={status} onValueChange={handleChange} disabled={pending}>
       <SelectTrigger className="w-40">
         <SelectValue />
       </SelectTrigger>

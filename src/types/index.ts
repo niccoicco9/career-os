@@ -1,12 +1,5 @@
 import type { Application, JobPosting, Note, Resume } from '@/generated/prisma/client'
-
-export type ApplicationStatus =
-  | 'SAVED'
-  | 'APPLIED'
-  | 'SCREENING'
-  | 'INTERVIEW'
-  | 'OFFER'
-  | 'REJECTED'
+export type { ApplicationStatus } from '@/generated/prisma/enums'
 
 export type ApplicationWithRelations = Application & {
   jobPosting: JobPosting
