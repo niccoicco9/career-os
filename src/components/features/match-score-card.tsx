@@ -12,10 +12,10 @@ interface MatchScoreCardProps {
 export function MatchScoreCard({ analysis }: MatchScoreCardProps) {
   const scoreColor =
     analysis.score >= 70
-      ? 'text-green-600'
+      ? 'text-green-600 dark:text-green-400'
       : analysis.score >= 50
-        ? 'text-yellow-600'
-        : 'text-red-600'
+        ? 'text-yellow-600 dark:text-yellow-400'
+        : 'text-red-600 dark:text-red-400'
 
   const scoreLabel =
     analysis.score >= 70 ? 'Ottimo match' : analysis.score >= 50 ? 'Match discreto' : 'Match basso'
@@ -36,10 +36,10 @@ export function MatchScoreCard({ analysis }: MatchScoreCardProps) {
           className={cn(
             'w-fit text-xs',
             analysis.score >= 70
-              ? 'bg-green-100 text-green-700'
+              ? 'bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300'
               : analysis.score >= 50
-                ? 'bg-yellow-100 text-yellow-700'
-                : 'bg-red-100 text-red-700'
+                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950/50 dark:text-yellow-300'
+                : 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300'
           )}
         >
           {scoreLabel}
@@ -56,7 +56,7 @@ export function MatchScoreCard({ analysis }: MatchScoreCardProps) {
             </p>
             <div className="flex flex-wrap gap-1.5">
               {analysis.matchingSkills.map((skill) => (
-                <Badge key={skill} variant="secondary" className="bg-green-100 text-green-700 text-xs">
+                <Badge key={skill} variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300 text-xs">
                   {skill}
                 </Badge>
               ))}
@@ -72,7 +72,7 @@ export function MatchScoreCard({ analysis }: MatchScoreCardProps) {
             </p>
             <div className="flex flex-wrap gap-1.5">
               {analysis.missingSkills.map((skill) => (
-                <Badge key={skill} variant="secondary" className="bg-red-100 text-red-700 text-xs">
+                <Badge key={skill} variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300 text-xs">
                   {skill}
                 </Badge>
               ))}

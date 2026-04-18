@@ -8,7 +8,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { type ApplicationWithRelations, STATUS_LABELS, STATUS_COLORS } from '@/types'
+import type { ApplicationWithRelations } from '@/types'
+import { STATUS_LABELS, STATUS_COLORS } from '@/lib/status'
 import { formatDistanceToNow } from 'date-fns'
 import { it } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -58,10 +59,10 @@ export function ApplicationsTable({ applications }: ApplicationsTableProps) {
                     className={cn(
                       'text-sm font-semibold',
                       app.matchScore >= 70
-                        ? 'text-green-600'
+                        ? 'text-green-600 dark:text-green-400'
                         : app.matchScore >= 50
-                          ? 'text-yellow-600'
-                          : 'text-red-600'
+                          ? 'text-yellow-600 dark:text-yellow-400'
+                          : 'text-red-600 dark:text-red-400'
                     )}
                   >
                     {app.matchScore}/100

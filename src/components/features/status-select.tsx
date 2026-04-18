@@ -9,7 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { STATUS_LABELS, type ApplicationStatus } from '@/types'
+import type { ApplicationStatus } from '@/types'
+import { STATUS_LABELS } from '@/lib/status'
 
 interface StatusSelectProps {
   applicationId: string

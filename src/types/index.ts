@@ -30,21 +30,3 @@ export type JobAnalysis = {
   location: string
   summary: string
 }
-
-export const STATUS_LABELS: Record<ApplicationStatus, string> = {
-  SAVED: 'Salvata',
-  APPLIED: 'Candidata',
-  SCREENING: 'Screening',
-  INTERVIEW: 'Colloquio',
-  OFFER: 'Offerta',
-  REJECTED: 'Rifiutata',
-}
-
-export const STATUS_COLORS: Record<ApplicationStatus, string> = {
-  SAVED: 'bg-slate-100 text-slate-700',
-  APPLIED: 'bg-blue-100 text-blue-700',
-  SCREENING: 'bg-yellow-100 text-yellow-700',
-  INTERVIEW: 'bg-purple-100 text-purple-700',
-  OFFER: 'bg-green-100 text-green-700',
-  REJECTED: 'bg-red-100 text-red-700',
-}

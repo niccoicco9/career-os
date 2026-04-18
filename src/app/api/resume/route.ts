@@ -131,8 +131,6 @@ export async function POST(request: Request) {
       )
     }
 
-    const { data: urlData } = supabase.storage.from('resumes').getPublicUrl(uploadData.path)
-
     let analysis: Analysis = EMPTY_ANALYSIS
     let aiError: string | null = null
 
@@ -159,7 +157,7 @@ export async function POST(request: Request) {
     const resume = await prisma.resume.create({
       data: {
         userId: user.id,
-        fileUrl: urlData.publicUrl,
+        fileUrl: uploadData.path,
         fileName: file.name,
         extractedText: analysis.extractedText || null,
         skills: analysis.skills,
