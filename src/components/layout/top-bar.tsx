@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { MobileSidebar } from '@/components/layout/sidebar'
+import { ThemeToggle } from '@/components/layout/theme-toggle'
 
 interface TopBarProps {
   userEmail?: string
@@ -16,6 +17,7 @@ export function TopBar({ userEmail, userName }: TopBarProps) {
       <MobileSidebar />
 
       <div className="flex items-center gap-3 ml-auto">
+        <ThemeToggle />
         <span className="text-sm text-muted-foreground hidden sm:block">
           {userName ?? userEmail}
         </span>
