@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { prisma } from '@/lib/prisma'
+import { getApplications } from '@/lib/data'
 import { ApplicationsTable } from '@/components/features/applications-table'
 import { buttonVariants } from '@/components/ui/button'
 import Link from 'next/link'
@@ -7,17 +7,10 @@ import { Plus } from 'lucide-react'
 
 export default async function ApplicationsPage() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return null
 
-  if (!user) return null
-
-  const applications = await prisma.application.findMany({
-    where: { userId: user.id },
-    include: { jobPosting: true, resume: true, notes: true },
-    orderBy: { createdAt: 'desc' },
-  })
+  const applications = await getApplications(session!.user.id)
 
   return (
     <div className="space-y-6">

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { prisma } from '@/lib/prisma'
+import { getProfile } from '@/lib/data'
 import { ResumeUpload } from '@/components/features/resume-upload'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -9,19 +9,10 @@ import { FileText, User } from 'lucide-react'
 
 export default async function ProfilePage() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return null
 
-  if (!user) return null
-
-  const [dbUser, resume] = await Promise.all([
-    prisma.user.findUnique({ where: { id: user.id } }),
-    prisma.resume.findFirst({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-    }),
-  ])
+  const [dbUser, resume] = await getProfile(session!.user.id)
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -42,7 +33,7 @@ export default async function ProfilePage() {
         <CardContent className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Email</span>
-            <span>{user.email}</span>
+            <span>{session!.user.email}</span>
           </div>
           {dbUser?.name && (
             <div className="flex justify-between text-sm">
@@ -99,7 +90,7 @@ export default async function ProfilePage() {
             </p>
           )}
 
-          <ResumeUpload userId={user.id} />
+          <ResumeUpload />
         </CardContent>
       </Card>
     </div>
