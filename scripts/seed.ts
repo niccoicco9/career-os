@@ -239,13 +239,15 @@ Deploy su AWS (S3, CloudFront, Lambda), testing con Jest e Cypress, state manage
 
   // Create applications
   for (const app of applications) {
+    const jobSkills = [...app.matchingSkills, ...app.missingSkills]
+
     const jobPosting = await prisma.jobPosting.create({
       data: {
         title: app.title,
         company: app.company,
         location: app.location,
         description: app.description,
-        skills: app.matchingSkills,
+        skills: jobSkills,
       },
     })
 
@@ -253,6 +255,7 @@ Deploy su AWS (S3, CloudFront, Lambda), testing con Jest e Cypress, state manage
       app.matchScore !== null
         ? {
             score: app.matchScore,
+            jobSkills,
             matchingSkills: app.matchingSkills,
             missingSkills: app.missingSkills,
             explanation: app.explanation,

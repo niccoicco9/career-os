@@ -137,14 +137,9 @@ export async function uploadResume(formData: FormData): Promise<{ aiError: strin
     console.error('[uploadResume] AI analysis failed:', aiError)
   }
 
-  await prisma.user.upsert({
-    where: { id: user.id },
-    update: {},
-    create: {
-      id: user.id,
-      email: user.email!,
-      name: user.user_metadata?.full_name ?? null,
-    },
+  const previousResumes = await prisma.resume.findMany({
+    where: { userId: user.id },
+    select: { id: true, fileUrl: true },
   })
 
   await prisma.resume.create({
@@ -157,6 +152,18 @@ export async function uploadResume(formData: FormData): Promise<{ aiError: strin
       rawAnalysis: analysis as object,
     },
   })
+
+  if (previousResumes.length > 0) {
+    await prisma.resume.deleteMany({
+      where: { id: { in: previousResumes.map((r) => r.id) } },
+    })
+    const { error: removeError } = await supabase.storage
+      .from('resumes')
+      .remove(previousResumes.map((r) => r.fileUrl))
+    if (removeError) {
+      console.error('[uploadResume] storage cleanup failed:', removeError.message)
+    }
+  }
 
   revalidatePath('/profile')
   return { aiError }

@@ -78,16 +78,6 @@ export async function createApplication(input: CreateApplicationInput) {
   const user = await requireUser()
   const parsed = createApplicationSchema.parse(input)
 
-  await prisma.user.upsert({
-    where: { id: user.id },
-    update: {},
-    create: {
-      id: user.id,
-      email: user.email!,
-      name: user.user_metadata?.full_name ?? null,
-    },
-  })
-
   const resume = await prisma.resume.findFirst({
     where: { userId: user.id },
     orderBy: { createdAt: 'desc' },
@@ -99,7 +89,7 @@ export async function createApplication(input: CreateApplicationInput) {
       company: parsed.company,
       description: parsed.description,
       url: parsed.url || null,
-      skills: parsed.matchAnalysis?.matchingSkills ?? [],
+      skills: parsed.matchAnalysis?.jobSkills ?? [],
     },
   })
 
@@ -157,6 +147,7 @@ ${parsedDescription}
 Restituisci un oggetto JSON con esattamente questo schema:
 {
   "score": <numero intero 0-100>,
+  "jobSkills": [<tutte le skill tecniche e strumenti richiesti dal ruolo estratti dalla JD, max 10>],
   "matchingSkills": [<skill realmente presenti nel CV e richieste dal ruolo, max 6>],
   "missingSkills": [<skill richieste dal ruolo ma assenti nel CV, max 5>],
   "explanation": "<spiegazione del punteggio basata sui fatti, max 2 frasi>",
