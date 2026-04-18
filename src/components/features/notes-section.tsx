@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,7 +16,6 @@ interface NotesSectionProps {
 }
 
 export function NotesSection({ applicationId, initialNotes }: NotesSectionProps) {
-  const router = useRouter()
   const [notes, setNotes] = useState(initialNotes)
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
@@ -38,7 +36,6 @@ export function NotesSection({ applicationId, initialNotes }: NotesSectionProps)
       const note = await res.json()
       setNotes([note, ...notes])
       setText('')
-      router.refresh()
     }
     setSaving(false)
   }
