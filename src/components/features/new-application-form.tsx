@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -20,6 +19,10 @@ import {
 import { Loader2, Sparkles } from 'lucide-react'
 import { MatchScoreCard } from '@/components/features/match-score-card'
 import type { MatchAnalysis } from '@/types'
+import {
+  analyzeJobMatch,
+  createApplication,
+} from '@/app/(dashboard)/applications/actions'
 
 const schema = z.object({
   title: z.string().min(2, 'Inserisci il titolo del ruolo'),
@@ -31,9 +34,8 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export function NewApplicationForm() {
-  const router = useRouter()
-  const [analyzing, setAnalyzing] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [analyzing, startAnalyzing] = useTransition()
+  const [saving, startSaving] = useTransition()
   const [matchAnalysis, setMatchAnalysis] = useState<MatchAnalysis | null>(null)
 
   const {
@@ -43,61 +45,31 @@ export function NewApplicationForm() {
     formState: { errors },
   } = useForm<FormData>({ resolver: zodResolver(schema) })
 
-  async function analyzeMatch() {
+  function analyzeMatch() {
     const { description } = getValues()
     if (!description || description.length < 50) {
       toast.error("Incolla prima la descrizione dell'annuncio")
       return
     }
 
-    setAnalyzing(true)
-    try {
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobDescription: description }),
-      })
-
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error ?? 'Errore analisi')
+    startAnalyzing(async () => {
+      try {
+        const data = await analyzeJobMatch(description)
+        setMatchAnalysis(data)
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Errore durante l'analisi")
       }
-
-      const data = await res.json()
-      setMatchAnalysis(data)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Errore durante l\'analisi')
-    } finally {
-      setAnalyzing(false)
-    }
+    })
   }
 
-  async function onSubmit(data: FormData) {
-    setSaving(true)
-    try {
-      const res = await fetch('/api/applications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...data,
-          matchAnalysis,
-          matchScore: matchAnalysis?.score ?? null,
-        }),
-      })
-
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error ?? 'Errore salvataggio')
+  function onSubmit(data: FormData) {
+    startSaving(async () => {
+      try {
+        await createApplication({ ...data, matchAnalysis })
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Errore durante il salvataggio')
       }
-
-      const { id } = await res.json()
-      toast.success('Candidatura salvata!')
-      router.push(`/applications/${id}`)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Errore durante il salvataggio')
-    } finally {
-      setSaving(false)
-    }
+    })
   }
 
   return (

@@ -1,18 +1,17 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useRef, useTransition } from 'react'
 import { toast } from 'sonner'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Upload, Loader2 } from 'lucide-react'
 import { PDF_MAX_SIZE_BYTES } from '@/lib/constants'
+import { uploadResume } from '@/app/(dashboard)/profile/actions'
 
 export function ResumeUpload() {
-  const router = useRouter()
-  const [uploading, setUploading] = useState(false)
+  const [uploading, startUpload] = useTransition()
   const inputRef = useRef<HTMLInputElement>(null)
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -26,35 +25,23 @@ export function ResumeUpload() {
       return
     }
 
-    setUploading(true)
     const formData = new FormData()
     formData.append('file', file)
 
-    try {
-      const res = await fetch('/api/resume', {
-        method: 'POST',
-        body: formData,
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error ?? 'Errore upload')
+    startUpload(async () => {
+      try {
+        const { aiError } = await uploadResume(formData)
+        if (aiError) {
+          toast.warning("CV salvato, ma l'analisi AI ha fallito: " + aiError)
+        } else {
+          toast.success('CV caricato e analizzato!')
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Errore durante il caricamento')
+      } finally {
+        if (inputRef.current) inputRef.current.value = ''
       }
-
-      if (data.aiError) {
-        toast.warning('CV salvato, ma l\'analisi AI ha fallito: ' + data.aiError)
-      } else {
-        toast.success('CV caricato e analizzato!')
-      }
-
-      router.refresh()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Errore durante il caricamento')
-    } finally {
-      setUploading(false)
-      if (inputRef.current) inputRef.current.value = ''
-    }
+    })
   }
 
   return (

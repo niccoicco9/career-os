@@ -1,10 +1,12 @@
-import { createClient } from '@/lib/supabase/server'
-import { getApiUser } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import Groq from 'groq-sdk'
-import { NextResponse } from 'next/server'
+'use server'
+
+import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { requireUser } from '@/lib/auth'
+import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { config } from '@/lib/config'
+import Groq from 'groq-sdk'
 import {
   AI_MODEL,
   AI_RESUME_MAX_TOKENS,
@@ -12,8 +14,6 @@ import {
   PDF_TEXT_MAX_CHARS,
   PDF_MAX_SIZE_BYTES,
 } from '@/lib/constants'
-
-const groq = new Groq({ apiKey: config.groqApiKey })
 
 const aiAnalysisSchema = z.object({
   skills: z.array(z.string()).default([]),
@@ -41,11 +41,10 @@ function parseAiAnalysis(text: string): AiAnalysis {
   const start = stripped.indexOf('{')
   const end = stripped.lastIndexOf('}')
   if (start === -1 || end === -1) {
-    console.error('[resume/route] non-JSON AI response:', stripped.slice(0, 500))
+    console.error('[uploadResume] non-JSON AI response:', stripped.slice(0, 500))
     throw new Error('No JSON object in AI response')
   }
-  const json = JSON.parse(stripped.slice(start, end + 1))
-  return aiAnalysisSchema.parse(json)
+  return aiAnalysisSchema.parse(JSON.parse(stripped.slice(start, end + 1)))
 }
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
@@ -60,6 +59,7 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
 }
 
 async function analyzeWithAI(pdfText: string): Promise<AiAnalysis> {
+  const groq = new Groq({ apiKey: config.groqApiKey })
   const message = await groq.chat.completions.create({
     model: AI_MODEL,
     max_tokens: AI_RESUME_MAX_TOKENS,
@@ -102,72 +102,62 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   ])
 }
 
-export async function POST(request: Request) {
-  try {
-    const user = await getApiUser()
-    if (!user) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
+export async function uploadResume(formData: FormData): Promise<{ aiError: string | null }> {
+  const user = await requireUser()
 
-    const supabase = await createClient()
-    const formData = await request.formData()
-    const file = formData.get('file')
-    if (!(file instanceof File) || file.type !== 'application/pdf') {
-      return NextResponse.json({ error: 'File PDF richiesto' }, { status: 400 })
-    }
-    if (file.size > PDF_MAX_SIZE_BYTES) {
-      return NextResponse.json({ error: 'File troppo grande (max 5MB)' }, { status: 400 })
-    }
-
-    const buffer = Buffer.from(await file.arrayBuffer())
-
-    const fileName = `${user.id}/${Date.now()}-${file.name}`
-    const { error: uploadError, data: uploadData } = await supabase.storage
-      .from('resumes')
-      .upload(fileName, buffer, { contentType: 'application/pdf', upsert: false })
-    if (uploadError) {
-      return NextResponse.json(
-        { error: 'Errore upload: ' + uploadError.message },
-        { status: 500 }
-      )
-    }
-
-    let analysis: Analysis = EMPTY_ANALYSIS
-    let aiError: string | null = null
-
-    try {
-      const pdfText = (await extractPdfText(buffer)).slice(0, PDF_TEXT_MAX_CHARS).trim()
-      if (!pdfText) throw new Error('PDF vuoto o non leggibile')
-      const ai = await withTimeout(analyzeWithAI(pdfText), AI_ANALYSIS_TIMEOUT_MS, 'AI analysis')
-      analysis = { ...ai, extractedText: pdfText }
-    } catch (err) {
-      aiError = err instanceof Error ? err.message : 'Errore analisi AI'
-      console.error('[resume/route] AI analysis failed:', aiError)
-    }
-
-    await prisma.user.upsert({
-      where: { id: user.id },
-      update: {},
-      create: {
-        id: user.id,
-        email: user.email!,
-        name: user.user_metadata?.full_name ?? null,
-      },
-    })
-
-    const resume = await prisma.resume.create({
-      data: {
-        userId: user.id,
-        fileUrl: uploadData.path,
-        fileName: file.name,
-        extractedText: analysis.extractedText || null,
-        skills: analysis.skills,
-        rawAnalysis: analysis as object,
-      },
-    })
-
-    return NextResponse.json({ id: resume.id, aiError }, { status: 201 })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Errore sconosciuto'
-    console.error('[resume/route] fatal:', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+  const file = formData.get('file')
+  if (!(file instanceof File) || file.type !== 'application/pdf') {
+    throw new Error('File PDF richiesto')
   }
+  if (file.size > PDF_MAX_SIZE_BYTES) {
+    throw new Error('File troppo grande (max 5MB)')
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer())
+
+  const supabase = await createClient()
+  const fileName = `${user.id}/${Date.now()}-${file.name}`
+  const { error: uploadError, data: uploadData } = await supabase.storage
+    .from('resumes')
+    .upload(fileName, buffer, { contentType: 'application/pdf', upsert: false })
+  if (uploadError) {
+    throw new Error('Errore upload: ' + uploadError.message)
+  }
+
+  let analysis: Analysis = EMPTY_ANALYSIS
+  let aiError: string | null = null
+
+  try {
+    const pdfText = (await extractPdfText(buffer)).slice(0, PDF_TEXT_MAX_CHARS).trim()
+    if (!pdfText) throw new Error('PDF vuoto o non leggibile')
+    const ai = await withTimeout(analyzeWithAI(pdfText), AI_ANALYSIS_TIMEOUT_MS, 'AI analysis')
+    analysis = { ...ai, extractedText: pdfText }
+  } catch (err) {
+    aiError = err instanceof Error ? err.message : 'Errore analisi AI'
+    console.error('[uploadResume] AI analysis failed:', aiError)
+  }
+
+  await prisma.user.upsert({
+    where: { id: user.id },
+    update: {},
+    create: {
+      id: user.id,
+      email: user.email!,
+      name: user.user_metadata?.full_name ?? null,
+    },
+  })
+
+  await prisma.resume.create({
+    data: {
+      userId: user.id,
+      fileUrl: uploadData.path,
+      fileName: file.name,
+      extractedText: analysis.extractedText || null,
+      skills: analysis.skills,
+      rawAnalysis: analysis as object,
+    },
+  })
+
+  revalidatePath('/profile')
+  return { aiError }
 }
