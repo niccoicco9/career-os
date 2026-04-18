@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { createClient } from '@/lib/supabase/server'
+import { requireUser } from '@/lib/auth'
 import { getDashboardData } from '@/lib/data'
 import { KpiCards } from '@/components/features/kpi-cards'
 import { ApplicationsTable } from '@/components/features/applications-table'
@@ -50,9 +50,7 @@ async function DashboardHeader({ userId }: { userId: string }) {
 }
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return null
+  const user = await requireUser()
 
   return (
     <div className="space-y-6">
@@ -62,7 +60,7 @@ export default async function DashboardPage() {
           <Skeleton className="h-9 w-36" />
         </div>
       }>
-        <DashboardHeader userId={session!.user.id} />
+        <DashboardHeader userId={user.id} />
       </Suspense>
 
       <Suspense fallback={
@@ -70,7 +68,7 @@ export default async function DashboardPage() {
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
         </div>
       }>
-        <DashboardKpi userId={session!.user.id} />
+        <DashboardKpi userId={user.id} />
       </Suspense>
 
       <div className="space-y-4">
@@ -85,7 +83,7 @@ export default async function DashboardPage() {
             {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
           </div>
         }>
-          <DashboardRecent userId={session!.user.id} />
+          <DashboardRecent userId={user.id} />
         </Suspense>
       </div>
     </div>

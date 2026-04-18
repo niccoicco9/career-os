@@ -1,4 +1,5 @@
 import { cache } from 'react'
+import { notFound } from 'next/navigation'
 import { prisma } from './prisma'
 
 export const getDashboardData = cache(async (userId: string) => {
@@ -50,3 +51,20 @@ export const getProfile = cache(async (userId: string) => {
     }),
   ])
 })
+
+export const getApplication = cache(async (userId: string, id: string) => {
+  return prisma.application.findFirst({
+    where: { id, userId },
+    include: {
+      jobPosting: true,
+      resume: true,
+      notes: { orderBy: { createdAt: 'desc' } },
+    },
+  })
+})
+
+export async function requireApplication(userId: string, id: string) {
+  const application = await getApplication(userId, id)
+  if (!application) notFound()
+  return application
+}

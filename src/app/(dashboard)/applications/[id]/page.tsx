@@ -1,15 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
-import { prisma } from '@/lib/prisma'
-import { notFound } from 'next/navigation'
-import { Badge } from '@/components/ui/badge'
+import { requireUser } from '@/lib/auth'
+import { requireApplication } from '@/lib/data'
+import { matchAnalysisSchema } from '@/lib/validators'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { MatchScoreCard } from '@/components/features/match-score-card'
 import { NotesSection } from '@/components/features/notes-section'
 import { StatusSelect } from '@/components/features/status-select'
 import { DeleteApplicationButton } from '@/components/features/delete-application-button'
-import type { MatchAnalysis } from '@/types'
-import { STATUS_LABELS, STATUS_COLORS } from '@/lib/status'
-import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
 import { Calendar, Building2, ExternalLink } from 'lucide-react'
@@ -20,22 +16,12 @@ export default async function ApplicationDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const supabase = await createClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session) return null
-
-  const application = await prisma.application.findFirst({
-    where: { id, userId: session!.user.id },
-    include: { jobPosting: true, resume: true, notes: { orderBy: { createdAt: 'desc' } } },
-  })
-
-  if (!application) notFound()
+  const user = await requireUser()
+  const application = await requireApplication(user.id, id)
 
   const { jobPosting, notes } = application
-  const analysis = application.matchAnalysis as MatchAnalysis | null
+  const parsedAnalysis = matchAnalysisSchema.safeParse(application.matchAnalysis)
+  const analysis = parsedAnalysis.success ? parsedAnalysis.data : null
 
   return (
     <div className="max-w-3xl space-y-6">

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { getApiUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -13,11 +13,7 @@ const schema = z.object({
 })
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
+  const user = await getApiUser()
   if (!user) {
     return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
   }

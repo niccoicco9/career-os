@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { getApiUser } from '@/lib/auth'
+import { getApplication } from '@/lib/data'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -13,11 +14,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
+  const user = await getApiUser()
   if (!user) {
     return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
   }
@@ -28,10 +25,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Dati non validi' }, { status: 400 })
   }
 
-  const application = await prisma.application.findFirst({
-    where: { id, userId: user.id },
-  })
-
+  const application = await getApplication(user.id, id)
   if (!application) {
     return NextResponse.json({ error: 'Non trovato' }, { status: 404 })
   }
@@ -49,17 +43,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
+  const user = await getApiUser()
   if (!user) {
     return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
   }
 
-  const application = await prisma.application.findFirst({
-    where: { id, userId: user.id },
-  })
-
+  const application = await getApplication(user.id, id)
   if (!application) {
     return NextResponse.json({ error: 'Non trovato' }, { status: 404 })
   }

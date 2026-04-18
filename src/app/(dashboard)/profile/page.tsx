@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { requireUser } from '@/lib/auth'
 import { getProfile } from '@/lib/data'
 import { ResumeUpload } from '@/components/features/resume-upload'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,11 +8,8 @@ import { it } from 'date-fns/locale'
 import { FileText, User } from 'lucide-react'
 
 export default async function ProfilePage() {
-  const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return null
-
-  const [dbUser, resume] = await getProfile(session!.user.id)
+  const user = await requireUser()
+  const [dbUser, resume] = await getProfile(user.id)
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -33,7 +30,7 @@ export default async function ProfilePage() {
         <CardContent className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Email</span>
-            <span>{session!.user.email}</span>
+            <span>{user.email}</span>
           </div>
           {dbUser?.name && (
             <div className="flex justify-between text-sm">

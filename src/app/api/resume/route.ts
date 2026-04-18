@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getApiUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import Groq from 'groq-sdk'
 import { NextResponse } from 'next/server'
@@ -103,12 +104,10 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getApiUser()
     if (!user) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
 
+    const supabase = await createClient()
     const formData = await request.formData()
     const file = formData.get('file')
     if (!(file instanceof File) || file.type !== 'application/pdf') {

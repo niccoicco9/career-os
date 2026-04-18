@@ -1,22 +1,15 @@
-import { createClient } from '@/lib/supabase/server'
+import { getApiUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import Groq from 'groq-sdk'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { config } from '@/lib/config'
 import { AI_MODEL, AI_ANALYZE_MAX_TOKENS } from '@/lib/constants'
+import { matchAnalysisSchema } from '@/lib/validators'
 
 const groq = new Groq({ apiKey: config.groqApiKey })
 
 const requestSchema = z.object({ jobDescription: z.string().min(50) })
-
-const matchSchema = z.object({
-  score: z.number().int().min(0).max(100),
-  matchingSkills: z.array(z.string()).default([]),
-  missingSkills: z.array(z.string()).default([]),
-  explanation: z.string().default(''),
-  suggestion: z.string().default(''),
-})
 
 function parseMatch(text: string) {
   const stripped = text
@@ -30,15 +23,12 @@ function parseMatch(text: string) {
     throw new Error('No JSON object in AI response')
   }
   const json = JSON.parse(stripped.slice(start, end + 1))
-  return matchSchema.parse(json)
+  return matchAnalysisSchema.parse(json)
 }
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getApiUser()
     if (!user) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
 
     const body = await request.json()
