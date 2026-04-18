@@ -5,12 +5,9 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Upload, Loader2 } from 'lucide-react'
+import { PDF_MAX_SIZE_BYTES } from '@/lib/constants'
 
-interface ResumeUploadProps {
-  userId: string
-}
-
-export function ResumeUpload({ userId }: ResumeUploadProps) {
+export function ResumeUpload() {
   const router = useRouter()
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -24,7 +21,7 @@ export function ResumeUpload({ userId }: ResumeUploadProps) {
       return
     }
 
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > PDF_MAX_SIZE_BYTES) {
       toast.error('Il file deve essere inferiore a 5MB')
       return
     }

@@ -1,34 +1,51 @@
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import Groq from 'groq-sdk'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { config } from '@/lib/config'
+import { AI_MODEL, AI_ANALYZE_MAX_TOKENS } from '@/lib/constants'
 
-const schema = z.object({ jobDescription: z.string().min(50) })
+const groq = new Groq({ apiKey: config.groqApiKey })
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+const requestSchema = z.object({ jobDescription: z.string().min(50) })
 
-function extractJson(text: string) {
-  const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
-  return JSON.parse(stripped)
+const matchSchema = z.object({
+  score: z.number().int().min(0).max(100),
+  matchingSkills: z.array(z.string()).default([]),
+  missingSkills: z.array(z.string()).default([]),
+  explanation: z.string().default(''),
+  suggestion: z.string().default(''),
+})
+
+function parseMatch(text: string) {
+  const stripped = text
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim()
+  const start = stripped.indexOf('{')
+  const end = stripped.lastIndexOf('}')
+  if (start === -1 || end === -1) {
+    console.error('[analyze/route] non-JSON AI response:', stripped.slice(0, 500))
+    throw new Error('No JSON object in AI response')
+  }
+  const json = JSON.parse(stripped.slice(start, end + 1))
+  return matchSchema.parse(json)
 }
 
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
-    }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
 
     const body = await request.json()
-    const parsed = schema.safeParse(body)
+    const parsed = requestSchema.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json({ error: 'Dati non validi' }, { status: 400 })
     }
-
-    const { jobDescription } = parsed.data
 
     const resume = await prisma.resume.findFirst({
       where: { userId: user.id },
@@ -36,33 +53,48 @@ export async function POST(request: Request) {
     })
 
     const resumeContext = resume?.extractedText
-      ? `CV dell'utente:\n${resume.extractedText}`
+      ? `CV dell'utente:\n"""\n${resume.extractedText}\n"""`
       : 'Nessun CV caricato. Restituisci score 0 e suggerisci di caricare il CV.'
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
-    const result = await model.generateContent(
-      `Sei un career coach esperto. Analizza la compatibilità tra questo CV e questa job description.
-
-${resumeContext}
+    const message = await groq.chat.completions.create({
+      model: AI_MODEL,
+      max_tokens: AI_ANALYZE_MAX_TOKENS,
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content:
+            'Sei un career coach esperto e rispondi sempre in formato JSON. Valuti la compatibilità CV/job description basandoti SOLO sui contenuti forniti. Non inventare skill non presenti nel CV.',
+        },
+        {
+          role: 'user',
+          content: `${resumeContext}
 
 Job Description:
-${jobDescription}
+"""
+${parsed.data.jobDescription}
+"""
 
-Rispondi SOLO con un oggetto JSON valido (nessun markdown, niente prima o dopo):
+Restituisci un oggetto JSON con esattamente questo schema:
 {
-  "score": <numero 0-100>,
-  "matchingSkills": [<skill presenti nel CV e richieste dal ruolo, max 6>],
-  "missingSkills": [<skill richieste ma assenti nel CV, max 5>],
-  "explanation": "<spiegazione breve del punteggio, max 2 frasi>",
+  "score": <numero intero 0-100>,
+  "matchingSkills": [<skill realmente presenti nel CV e richieste dal ruolo, max 6>],
+  "missingSkills": [<skill richieste dal ruolo ma assenti nel CV, max 5>],
+  "explanation": "<spiegazione del punteggio basata sui fatti, max 2 frasi>",
   "suggestion": "<un suggerimento operativo concreto, max 1 frase>"
-}`
-    )
+}`,
+        },
+      ],
+    })
 
-    const text = result.response.text()
-    const analysis = extractJson(text)
+    const text = message.choices[0]?.message?.content ?? ''
+    if (!text) throw new Error('Empty response from AI')
+    const analysis = parseMatch(text)
     return NextResponse.json(analysis)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Errore sconosciuto'
+    console.error('[analyze/route] failed:', message)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
