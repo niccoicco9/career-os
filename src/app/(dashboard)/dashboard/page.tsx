@@ -6,9 +6,9 @@ import {
   getDashboardRecent,
   getStatusBreakdown,
 } from '@/lib/data'
-import { KpiCards } from '@/components/features/kpi-cards'
 import { ApplicationsTable } from '@/components/features/applications-table'
-import { StatusFunnel } from '@/components/features/status-funnel'
+import { KpiCards } from './_components/kpi-cards'
+import { StatusFunnel } from './_components/status-funnel'
 import { Skeleton } from '@/components/ui/skeleton'
 import { buttonVariants } from '@/components/ui/button'
 import Link from 'next/link'

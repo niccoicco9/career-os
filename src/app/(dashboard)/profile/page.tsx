@@ -1,6 +1,6 @@
 import { requireUser } from '@/lib/auth'
 import { getProfile } from '@/lib/data'
-import { ResumeUpload } from '@/components/features/resume-upload'
+import { ResumeUpload } from './_components/resume-upload'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { format } from 'date-fns'

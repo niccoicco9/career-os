@@ -73,26 +73,32 @@ npm run dev
 ```
 src/
 ├── app/
-│   ├── (auth)/              # login, signup (Supabase)
-│   ├── (dashboard)/         # protected routes
-│   │   ├── applications/    # list, detail, new + Server Actions
-│   │   ├── dashboard/       # streaming KPI/funnel/recent
-│   │   └── profile/         # CV upload + Server Action
-│   └── api/auth/callback    # OAuth callback
+│   ├── (auth)/                     # login, signup (Supabase)
+│   ├── (dashboard)/                # protected routes
+│   │   ├── applications/
+│   │   │   ├── _components/        # shared across applications subtree (MatchScoreCard)
+│   │   │   ├── [id]/_components/   # detail-only (NotesSection, DeleteApplicationButton)
+│   │   │   ├── new/_components/    # new-only (NewApplicationForm)
+│   │   │   └── actions.ts          # Server Actions
+│   │   ├── dashboard/_components/  # KpiCards, StatusFunnel
+│   │   └── profile/_components/    # ResumeUpload + Server Action
+│   └── api/auth/callback           # OAuth callback
 ├── components/
-│   ├── features/            # domain components
-│   ├── layout/              # sidebar, topbar, theme toggle
-│   └── ui/                  # shadcn primitives
+│   ├── features/                   # cross-route domain components (ApplicationsTable, filters, pickers)
+│   ├── layout/                     # sidebar, topbar, theme toggle
+│   └── ui/                         # shadcn primitives
 ├── lib/
-│   ├── ai.ts                # centralized JSON parsing
-│   ├── auth.ts              # requireUser helper (cached per request)
-│   ├── data.ts              # all Prisma queries (cached per request)
-│   ├── logger.ts            # structured logging
-│   ├── rate-limit.ts        # sliding window
-│   ├── status.ts            # STATUS_* + scoreTone helpers
-│   └── validators.ts        # Zod schemas
-└── types/index.ts           # Prisma-derived list/detail types
+│   ├── ai.ts                       # centralized JSON parsing
+│   ├── auth.ts                     # requireUser helper (cached per request)
+│   ├── data.ts                     # all Prisma queries (cached per request)
+│   ├── logger.ts                   # structured logging
+│   ├── rate-limit.ts               # sliding window
+│   ├── status.ts                   # STATUS_* + scoreTone helpers
+│   └── validators.ts               # Zod schemas
+└── types/index.ts                  # Prisma-derived list/detail types
 ```
+
+> Single-use components sit next to their route in `_components/` (Next.js private folder convention — excluded from routing). Only components shared across multiple routes live in `src/components/features/`.
 
 ## What I'd do next
 

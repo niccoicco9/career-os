@@ -18,7 +18,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Loader2, Sparkles } from 'lucide-react'
-import { MatchScoreCard } from '@/components/features/match-score-card'
+import { MatchScoreCard } from '../../_components/match-score-card'
 import type { MatchAnalysis } from '@/types'
 import {
   analyzeJobMatch,
