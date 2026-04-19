@@ -1,7 +1,6 @@
 'use server'
 
-import Groq from 'groq-sdk'
-import { redirect } from 'next/navigation'
+import { Mistral } from '@mistralai/mistralai'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireUser } from '@/lib/auth'
@@ -9,7 +8,9 @@ import { getApplication } from '@/lib/data'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@/generated/prisma/client'
 import { config } from '@/lib/config'
-import { AI_MODEL, AI_ANALYZE_MAX_TOKENS } from '@/lib/constants'
+import { AI_MODEL, AI_ANALYZE_MAX_TOKENS, AI_RATE_LIMIT, AI_RATE_WINDOW_MS } from '@/lib/constants'
+import { checkRateLimit } from '@/lib/rate-limit'
+import { parseJsonResponse } from '@/lib/ai'
 import { matchAnalysisSchema } from '@/lib/validators'
 import type { MatchAnalysis } from '@/lib/validators'
 import { ApplicationStatus } from '@/generated/prisma/enums'
@@ -17,24 +18,54 @@ import { ApplicationStatus } from '@/generated/prisma/enums'
 const statusSchema = z.nativeEnum(ApplicationStatus)
 const noteSchema = z.string().trim().min(1).max(5000)
 
+const httpUrlSchema = z
+  .string()
+  .url()
+  .max(2000)
+  .refine((u) => /^https?:\/\//i.test(u), { message: 'URL deve iniziare con http(s)://' })
+
 const createApplicationSchema = z.object({
-  title: z.string().min(1),
-  company: z.string().min(1),
-  description: z.string().min(1),
-  url: z.string().url().or(z.literal('')).optional(),
-  matchAnalysis: matchAnalysisSchema.nullable().optional(),
+  title: z.string().min(1).max(200),
+  company: z.string().min(1).max(200),
+  description: z.string().min(1).max(10000),
+  url: httpUrlSchema.or(z.literal('')).optional(),
+  matchAnalysis: matchAnalysisSchema.nullable(),
 })
 
 type CreateApplicationInput = z.infer<typeof createApplicationSchema>
 
-const jobDescriptionSchema = z.string().trim().min(50)
+const jobDescriptionSchema = z.string().trim().min(50).max(10000)
 
-export async function updateApplicationStatus(id: string, status: ApplicationStatus) {
+async function requireOwnedApplication(id: string) {
   const user = await requireUser()
-  const parsedStatus = statusSchema.parse(status)
-
   const application = await getApplication(user.id, id)
   if (!application) throw new Error('Candidatura non trovata')
+  return { user, application }
+}
+
+export async function updateFollowUpDate(id: string, date: string | null) {
+  await requireOwnedApplication(id)
+
+  let followUpDate: Date | null = null
+  if (date) {
+    const parsed = new Date(date)
+    if (Number.isNaN(parsed.getTime())) throw new Error('Data non valida')
+    followUpDate = parsed
+  }
+
+  await prisma.application.update({
+    where: { id },
+    data: { followUpDate },
+  })
+
+  revalidatePath(`/applications/${id}`)
+  revalidatePath('/applications')
+  revalidatePath('/dashboard')
+}
+
+export async function updateApplicationStatus(id: string, status: ApplicationStatus) {
+  const parsedStatus = statusSchema.parse(status)
+  await requireOwnedApplication(id)
 
   await prisma.application.update({
     where: { id },
@@ -47,24 +78,25 @@ export async function updateApplicationStatus(id: string, status: ApplicationSta
 }
 
 export async function deleteApplication(id: string) {
-  const user = await requireUser()
+  const { application } = await requireOwnedApplication(id)
 
-  const application = await getApplication(user.id, id)
-  if (!application) throw new Error('Candidatura non trovata')
-
-  await prisma.application.delete({ where: { id } })
+  await prisma.$transaction(async (tx) => {
+    await tx.application.delete({ where: { id } })
+    const remaining = await tx.application.count({
+      where: { jobPostingId: application.jobPostingId },
+    })
+    if (remaining === 0) {
+      await tx.jobPosting.delete({ where: { id: application.jobPostingId } })
+    }
+  })
 
   revalidatePath('/applications')
   revalidatePath('/dashboard')
-  redirect('/applications')
 }
 
 export async function createNote(applicationId: string, content: string) {
-  const user = await requireUser()
   const parsedContent = noteSchema.parse(content)
-
-  const application = await getApplication(user.id, applicationId)
-  if (!application) throw new Error('Candidatura non trovata')
+  await requireOwnedApplication(applicationId)
 
   const note = await prisma.note.create({
     data: { applicationId, content: parsedContent },
@@ -74,44 +106,47 @@ export async function createNote(applicationId: string, content: string) {
   return note
 }
 
-export async function createApplication(input: CreateApplicationInput) {
+export async function createApplication(input: CreateApplicationInput): Promise<{ id: string }> {
   const user = await requireUser()
   const parsed = createApplicationSchema.parse(input)
 
   const resume = await prisma.resume.findFirst({
     where: { userId: user.id },
     orderBy: { createdAt: 'desc' },
+    select: { id: true },
   })
 
-  const jobPosting = await prisma.jobPosting.create({
-    data: {
-      title: parsed.title,
-      company: parsed.company,
-      description: parsed.description,
-      url: parsed.url || null,
-      skills: parsed.matchAnalysis?.jobSkills ?? [],
-    },
-  })
-
-  const application = await prisma.application.create({
-    data: {
-      userId: user.id,
-      jobPostingId: jobPosting.id,
-      resumeId: resume?.id ?? null,
-      status: 'APPLIED',
-      matchScore: parsed.matchAnalysis?.score ?? null,
-      matchAnalysis: parsed.matchAnalysis ?? Prisma.JsonNull,
-      appliedAt: new Date(),
-    },
+  const application = await prisma.$transaction(async (tx) => {
+    const jobPosting = await tx.jobPosting.create({
+      data: {
+        title: parsed.title,
+        company: parsed.company,
+        description: parsed.description,
+        url: parsed.url || null,
+        skills: parsed.matchAnalysis?.jobSkills ?? [],
+      },
+    })
+    return tx.application.create({
+      data: {
+        userId: user.id,
+        jobPostingId: jobPosting.id,
+        resumeId: resume?.id ?? null,
+        status: 'APPLIED',
+        matchScore: parsed.matchAnalysis?.score ?? null,
+        matchAnalysis: parsed.matchAnalysis ?? Prisma.JsonNull,
+        appliedAt: new Date(),
+      },
+    })
   })
 
   revalidatePath('/applications')
   revalidatePath('/dashboard')
-  redirect(`/applications/${application.id}`)
+  return { id: application.id }
 }
 
 export async function analyzeJobMatch(jobDescription: string): Promise<MatchAnalysis> {
   const user = await requireUser()
+  checkRateLimit(`ai:analyze:${user.id}`, AI_RATE_LIMIT, AI_RATE_WINDOW_MS)
   const parsedDescription = jobDescriptionSchema.parse(jobDescription)
 
   const resume = await prisma.resume.findFirst({
@@ -123,12 +158,12 @@ export async function analyzeJobMatch(jobDescription: string): Promise<MatchAnal
     ? `CV dell'utente:\n"""\n${resume.extractedText}\n"""`
     : 'Nessun CV caricato. Restituisci score 0 e suggerisci di caricare il CV.'
 
-  const groq = new Groq({ apiKey: config.groqApiKey })
-  const message = await groq.chat.completions.create({
+  const client = new Mistral({ apiKey: config.mistralApiKey })
+  const response = await client.chat.complete({
     model: AI_MODEL,
-    max_tokens: AI_ANALYZE_MAX_TOKENS,
     temperature: 0.2,
-    response_format: { type: 'json_object' },
+    maxTokens: AI_ANALYZE_MAX_TOKENS,
+    responseFormat: { type: 'json_object' },
     messages: [
       {
         role: 'system',
@@ -157,17 +192,8 @@ Restituisci un oggetto JSON con esattamente questo schema:
     ],
   })
 
-  const text = message.choices[0]?.message?.content ?? ''
+  const raw = response.choices?.[0]?.message?.content
+  const text = typeof raw === 'string' ? raw : ''
   if (!text) throw new Error('Empty response from AI')
-  const stripped = text
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/, '')
-    .trim()
-  const start = stripped.indexOf('{')
-  const end = stripped.lastIndexOf('}')
-  if (start === -1 || end === -1) {
-    console.error('[analyzeJobMatch] non-JSON AI response:', stripped.slice(0, 500))
-    throw new Error('No JSON object in AI response')
-  }
-  return matchAnalysisSchema.parse(JSON.parse(stripped.slice(start, end + 1)))
+  return parseJsonResponse(text, matchAnalysisSchema, 'analyzeJobMatch')
 }

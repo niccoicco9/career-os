@@ -8,14 +8,34 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import type { ApplicationWithRelations } from '@/types'
-import { STATUS_LABELS, STATUS_COLORS } from '@/lib/status'
-import { formatDistanceToNow } from 'date-fns'
+import type { ApplicationListItem } from '@/types'
+import {
+  STATUS_LABELS,
+  STATUS_COLORS,
+  SCORE_TEXT_COLORS,
+  scoreTone,
+} from '@/lib/status'
+import { formatDistanceToNow, differenceInCalendarDays, format } from 'date-fns'
 import { it } from 'date-fns/locale'
+import { CalendarClock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+function followUpLabel(date: Date) {
+  const days = differenceInCalendarDays(date, new Date())
+  if (days < 0) return { text: 'Follow-up scaduto', tone: 'destructive' as const }
+  if (days === 0) return { text: 'Follow-up oggi', tone: 'warning' as const }
+  if (days <= 7) return { text: `Follow-up tra ${days}g`, tone: 'warning' as const }
+  return { text: format(date, 'd MMM', { locale: it }), tone: 'muted' as const }
+}
+
+const followUpClasses = {
+  destructive: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
+  warning: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950/50 dark:text-yellow-300',
+  muted: 'bg-muted text-muted-foreground',
+}
+
 interface ApplicationsTableProps {
-  applications: ApplicationWithRelations[]
+  applications: ApplicationListItem[]
 }
 
 export function ApplicationsTable({ applications }: ApplicationsTableProps) {
@@ -28,16 +48,17 @@ export function ApplicationsTable({ applications }: ApplicationsTableProps) {
             <TableHead>Azienda</TableHead>
             <TableHead>Stato</TableHead>
             <TableHead>Score</TableHead>
+            <TableHead>Follow-up</TableHead>
             <TableHead className="text-right">Aggiunta</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {applications.map((app) => (
-            <TableRow key={app.id} className="cursor-pointer hover:bg-muted/50">
+            <TableRow key={app.id} className="relative hover:bg-muted/50 focus-within:bg-muted/50">
               <TableCell>
                 <Link
                   href={`/applications/${app.id}`}
-                  className="font-medium hover:text-primary transition-colors"
+                  className="font-medium transition-colors hover:text-primary after:absolute after:inset-0 after:content-['']"
                 >
                   {app.jobPosting.title}
                 </Link>
@@ -58,15 +79,29 @@ export function ApplicationsTable({ applications }: ApplicationsTableProps) {
                   <span
                     className={cn(
                       'text-sm font-semibold',
-                      app.matchScore >= 70
-                        ? 'text-green-600 dark:text-green-400'
-                        : app.matchScore >= 50
-                          ? 'text-yellow-600 dark:text-yellow-400'
-                          : 'text-red-600 dark:text-red-400'
+                      SCORE_TEXT_COLORS[scoreTone(app.matchScore)]
                     )}
                   >
                     {app.matchScore}/100
                   </span>
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
+              </TableCell>
+              <TableCell>
+                {app.followUpDate ? (
+                  (() => {
+                    const { text, tone } = followUpLabel(new Date(app.followUpDate))
+                    return (
+                      <Badge
+                        variant="secondary"
+                        className={cn('text-xs gap-1', followUpClasses[tone])}
+                      >
+                        <CalendarClock className="size-3" />
+                        {text}
+                      </Badge>
+                    )
+                  })()
                 ) : (
                   <span className="text-sm text-muted-foreground">—</span>
                 )}

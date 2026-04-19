@@ -5,7 +5,7 @@ function requireEnv(key: string): string {
 }
 
 export const config = {
-  groqApiKey: requireEnv('GROQ_API_KEY'),
+  mistralApiKey: requireEnv('MISTRAL_API_KEY'),
   supabaseUrl: requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
   supabaseAnonKey: requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
 } as const

@@ -6,14 +6,18 @@ import { requireUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { config } from '@/lib/config'
-import Groq from 'groq-sdk'
+import { Mistral } from '@mistralai/mistralai'
 import {
   AI_MODEL,
   AI_RESUME_MAX_TOKENS,
   AI_ANALYSIS_TIMEOUT_MS,
   PDF_TEXT_MAX_CHARS,
   PDF_MAX_SIZE_BYTES,
+  RESUME_RATE_LIMIT,
+  RESUME_RATE_WINDOW_MS,
 } from '@/lib/constants'
+import { checkRateLimit } from '@/lib/rate-limit'
+import { parseJsonResponse } from '@/lib/ai'
 
 const aiAnalysisSchema = z.object({
   skills: z.array(z.string()).default([]),
@@ -33,20 +37,6 @@ const EMPTY_ANALYSIS: Analysis = {
   summary: '',
 }
 
-function parseAiAnalysis(text: string): AiAnalysis {
-  const stripped = text
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/, '')
-    .trim()
-  const start = stripped.indexOf('{')
-  const end = stripped.lastIndexOf('}')
-  if (start === -1 || end === -1) {
-    console.error('[uploadResume] non-JSON AI response:', stripped.slice(0, 500))
-    throw new Error('No JSON object in AI response')
-  }
-  return aiAnalysisSchema.parse(JSON.parse(stripped.slice(start, end + 1)))
-}
-
 async function extractPdfText(buffer: Buffer): Promise<string> {
   const { PDFParse } = await import('pdf-parse')
   const parser = new PDFParse({ data: buffer })
@@ -59,12 +49,12 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
 }
 
 async function analyzeWithAI(pdfText: string): Promise<AiAnalysis> {
-  const groq = new Groq({ apiKey: config.groqApiKey })
-  const message = await groq.chat.completions.create({
+  const client = new Mistral({ apiKey: config.mistralApiKey })
+  const response = await client.chat.complete({
     model: AI_MODEL,
-    max_tokens: AI_RESUME_MAX_TOKENS,
     temperature: 0.1,
-    response_format: { type: 'json_object' },
+    maxTokens: AI_RESUME_MAX_TOKENS,
+    responseFormat: { type: 'json_object' },
     messages: [
       {
         role: 'system',
@@ -88,9 +78,10 @@ ${pdfText}
       },
     ],
   })
-  const text = message.choices[0]?.message?.content ?? ''
+  const raw = response.choices?.[0]?.message?.content
+  const text = typeof raw === 'string' ? raw : ''
   if (!text) throw new Error('Empty response from AI')
-  return parseAiAnalysis(text)
+  return parseJsonResponse(text, aiAnalysisSchema, 'uploadResume')
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -104,6 +95,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 export async function uploadResume(formData: FormData): Promise<{ aiError: string | null }> {
   const user = await requireUser()
+  checkRateLimit(`resume:upload:${user.id}`, RESUME_RATE_LIMIT, RESUME_RATE_WINDOW_MS)
 
   const file = formData.get('file')
   if (!(file instanceof File) || file.type !== 'application/pdf') {
@@ -115,11 +107,13 @@ export async function uploadResume(formData: FormData): Promise<{ aiError: strin
 
   const buffer = Buffer.from(await file.arrayBuffer())
 
+  const safeName = file.name.replace(/[^\w.\-]/g, '_').slice(-100) || 'resume.pdf'
+
   const supabase = await createClient()
-  const fileName = `${user.id}/${Date.now()}-${file.name}`
+  const storagePath = `${user.id}/${Date.now()}-${safeName}`
   const { error: uploadError, data: uploadData } = await supabase.storage
     .from('resumes')
-    .upload(fileName, buffer, { contentType: 'application/pdf', upsert: false })
+    .upload(storagePath, buffer, { contentType: 'application/pdf', upsert: false })
   if (uploadError) {
     throw new Error('Errore upload: ' + uploadError.message)
   }
@@ -137,26 +131,30 @@ export async function uploadResume(formData: FormData): Promise<{ aiError: strin
     console.error('[uploadResume] AI analysis failed:', aiError)
   }
 
-  const previousResumes = await prisma.resume.findMany({
-    where: { userId: user.id },
-    select: { id: true, fileUrl: true },
-  })
-
-  await prisma.resume.create({
-    data: {
-      userId: user.id,
-      fileUrl: uploadData.path,
-      fileName: file.name,
-      extractedText: analysis.extractedText || null,
-      skills: analysis.skills,
-      rawAnalysis: analysis as object,
-    },
+  const previousResumes = await prisma.$transaction(async (tx) => {
+    const previous = await tx.resume.findMany({
+      where: { userId: user.id },
+      select: { id: true, fileUrl: true },
+    })
+    await tx.resume.create({
+      data: {
+        userId: user.id,
+        fileUrl: uploadData.path,
+        fileName: file.name,
+        extractedText: analysis.extractedText || null,
+        skills: analysis.skills,
+        rawAnalysis: analysis as object,
+      },
+    })
+    if (previous.length > 0) {
+      await tx.resume.deleteMany({
+        where: { id: { in: previous.map((r) => r.id) } },
+      })
+    }
+    return previous
   })
 
   if (previousResumes.length > 0) {
-    await prisma.resume.deleteMany({
-      where: { id: { in: previousResumes.map((r) => r.id) } },
-    })
     const { error: removeError } = await supabase.storage
       .from('resumes')
       .remove(previousResumes.map((r) => r.fileUrl))

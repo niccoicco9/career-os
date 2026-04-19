@@ -10,15 +10,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { ApplicationStatus } from '@/types'
-import { STATUS_LABELS } from '@/lib/status'
+import { STATUS_LABELS, STATUS_ORDER } from '@/lib/status'
 import { updateApplicationStatus } from '@/app/(dashboard)/applications/actions'
 
 interface StatusSelectProps {
   applicationId: string
   currentStatus: ApplicationStatus
 }
-
-const statuses = Object.keys(STATUS_LABELS) as ApplicationStatus[]
 
 export function StatusSelect({ applicationId, currentStatus }: StatusSelectProps) {
   const [status, setStatus] = useState<ApplicationStatus>(currentStatus)
@@ -32,6 +30,7 @@ export function StatusSelect({ applicationId, currentStatus }: StatusSelectProps
     startTransition(async () => {
       try {
         await updateApplicationStatus(applicationId, nextStatus)
+        toast.success('Stato aggiornato')
       } catch {
         setStatus(prev)
         toast.error('Errore aggiornamento stato')
@@ -45,7 +44,7 @@ export function StatusSelect({ applicationId, currentStatus }: StatusSelectProps
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {statuses.map((s) => (
+        {STATUS_ORDER.map((s) => (
           <SelectItem key={s} value={s}>
             {STATUS_LABELS[s]}
           </SelectItem>

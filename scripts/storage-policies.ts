@@ -20,8 +20,8 @@ async function main() {
     try {
       await client.query(sql)
       console.log('✓ Policy created')
-    } catch (e: any) {
-      if (e.message.includes('already exists')) {
+    } catch (e: unknown) {
+      if (e instanceof Error && e.message.includes('already exists')) {
         console.log('✓ Policy already exists, skipping')
       } else {
         throw e

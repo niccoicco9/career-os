@@ -37,7 +37,9 @@ export async function proxy(request: NextRequest) {
   const isAuth = authRoutes.some((r) => pathname.startsWith(r))
 
   if (isProtected && !user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('next', pathname + request.nextUrl.search)
+    return NextResponse.redirect(loginUrl)
   }
 
   if (isAuth && user) {

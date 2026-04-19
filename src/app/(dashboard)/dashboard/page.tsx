@@ -1,20 +1,31 @@
 import { Suspense } from 'react'
 import { requireUser } from '@/lib/auth'
-import { getDashboardData } from '@/lib/data'
+import {
+  getDashboardUser,
+  getDashboardKpi,
+  getDashboardRecent,
+  getStatusBreakdown,
+} from '@/lib/data'
 import { KpiCards } from '@/components/features/kpi-cards'
 import { ApplicationsTable } from '@/components/features/applications-table'
+import { StatusFunnel } from '@/components/features/status-funnel'
 import { Skeleton } from '@/components/ui/skeleton'
 import { buttonVariants } from '@/components/ui/button'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 
 async function DashboardKpi({ userId }: { userId: string }) {
-  const { kpi } = await getDashboardData(userId)
+  const kpi = await getDashboardKpi(userId)
   return <KpiCards kpi={kpi} />
 }
 
+async function DashboardFunnel({ userId }: { userId: string }) {
+  const breakdown = await getStatusBreakdown(userId)
+  return <StatusFunnel breakdown={breakdown} />
+}
+
 async function DashboardRecent({ userId }: { userId: string }) {
-  const { applications } = await getDashboardData(userId)
+  const applications = await getDashboardRecent(userId)
   if (applications.length === 0) {
     return (
       <div className="border border-dashed border-border rounded-lg py-16 text-center">
@@ -32,7 +43,7 @@ async function DashboardRecent({ userId }: { userId: string }) {
 }
 
 async function DashboardHeader({ userId }: { userId: string }) {
-  const { dbUser } = await getDashboardData(userId)
+  const dbUser = await getDashboardUser(userId)
   return (
     <div className="flex items-center justify-between">
       <div>
@@ -69,6 +80,10 @@ export default async function DashboardPage() {
         </div>
       }>
         <DashboardKpi userId={user.id} />
+      </Suspense>
+
+      <Suspense fallback={<Skeleton className="h-72 rounded-xl" />}>
+        <DashboardFunnel userId={user.id} />
       </Suspense>
 
       <div className="space-y-4">

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { MatchScoreCard } from '@/components/features/match-score-card'
 import { NotesSection } from '@/components/features/notes-section'
 import { StatusSelect } from '@/components/features/status-select'
+import { FollowUpPicker } from '@/components/features/follow-up-picker'
 import { DeleteApplicationButton } from '@/components/features/delete-application-button'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
@@ -61,6 +62,18 @@ export default async function ApplicationDetailPage({
           />
         </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Promemoria follow-up</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <FollowUpPicker
+            applicationId={application.id}
+            initialDate={application.followUpDate}
+          />
+        </CardContent>
+      </Card>
 
       {analysis && <MatchScoreCard analysis={analysis} />}
 

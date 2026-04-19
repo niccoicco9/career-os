@@ -4,21 +4,19 @@ import { Progress } from '@/components/ui/progress'
 import { CheckCircle, XCircle, Lightbulb } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { MatchAnalysis } from '@/types'
+import {
+  SCORE_TEXT_COLORS,
+  SCORE_BADGE_COLORS,
+  SCORE_LABELS,
+  scoreTone,
+} from '@/lib/status'
 
 interface MatchScoreCardProps {
   analysis: MatchAnalysis
 }
 
 export function MatchScoreCard({ analysis }: MatchScoreCardProps) {
-  const scoreColor =
-    analysis.score >= 70
-      ? 'text-green-600 dark:text-green-400'
-      : analysis.score >= 50
-        ? 'text-yellow-600 dark:text-yellow-400'
-        : 'text-red-600 dark:text-red-400'
-
-  const scoreLabel =
-    analysis.score >= 70 ? 'Ottimo match' : analysis.score >= 50 ? 'Match discreto' : 'Match basso'
+  const tone = scoreTone(analysis.score)
 
   return (
     <Card className="border-primary/20 bg-primary/5">
@@ -26,23 +24,15 @@ export function MatchScoreCard({ analysis }: MatchScoreCardProps) {
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">Analisi compatibilità</CardTitle>
           <div className="flex items-center gap-2">
-            <span className={cn('text-3xl font-bold', scoreColor)}>{analysis.score}</span>
+            <span className={cn('text-3xl font-bold', SCORE_TEXT_COLORS[tone])}>
+              {analysis.score}
+            </span>
             <span className="text-muted-foreground text-sm">/100</span>
           </div>
         </div>
         <Progress value={analysis.score} className="h-2" />
-        <Badge
-          variant="secondary"
-          className={cn(
-            'w-fit text-xs',
-            analysis.score >= 70
-              ? 'bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300'
-              : analysis.score >= 50
-                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950/50 dark:text-yellow-300'
-                : 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300'
-          )}
-        >
-          {scoreLabel}
+        <Badge variant="secondary" className={cn('w-fit text-xs', SCORE_BADGE_COLORS[tone])}>
+          {SCORE_LABELS[tone]}
         </Badge>
       </CardHeader>
       <CardContent className="space-y-4">

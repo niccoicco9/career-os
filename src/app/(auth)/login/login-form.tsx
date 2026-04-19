@@ -21,7 +21,7 @@ import {
 
 const schema = z.object({
   email: z.string().email('Email non valida'),
-  password: z.string().min(6, 'Minimo 6 caratteri'),
+  password: z.string().min(8, 'Minimo 8 caratteri'),
 })
 
 type FormData = z.infer<typeof schema>
@@ -29,10 +29,16 @@ type FormData = z.infer<typeof schema>
 const DEMO_EMAIL = 'demo@careeros.app'
 const DEMO_PASSWORD = 'demo123456'
 
+function safeNext(next: string | null): string {
+  if (!next || !next.startsWith('/') || next.startsWith('//')) return '/dashboard'
+  return next
+}
+
 export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const isDemo = searchParams.get('demo') === 'true'
+  const next = safeNext(searchParams.get('next'))
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
@@ -59,7 +65,7 @@ export function LoginForm() {
       return
     }
 
-    router.push('/dashboard')
+    router.push(next)
     router.refresh()
   }
 

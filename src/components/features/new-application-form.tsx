@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -34,6 +35,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export function NewApplicationForm() {
+  const router = useRouter()
   const [analyzing, startAnalyzing] = useTransition()
   const [saving, startSaving] = useTransition()
   const [matchAnalysis, setMatchAnalysis] = useState<MatchAnalysis | null>(null)
@@ -65,7 +67,8 @@ export function NewApplicationForm() {
   function onSubmit(data: FormData) {
     startSaving(async () => {
       try {
-        await createApplication({ ...data, matchAnalysis })
+        const { id } = await createApplication({ ...data, matchAnalysis })
+        router.push(`/applications/${id}`)
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Errore durante il salvataggio')
       }

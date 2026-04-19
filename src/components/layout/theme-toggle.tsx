@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useSyncExternalStore } from 'react'
 import { useTheme } from 'next-themes'
 import { Monitor, Moon, Sun } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -12,11 +12,11 @@ const LABELS: Record<(typeof ORDER)[number], string> = {
   system: 'Tema di sistema',
 }
 
+const emptySubscribe = () => () => {}
+
 export function ThemeToggle() {
   const { theme, setTheme, resolvedTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => setMounted(true), [])
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
   if (!mounted) {
     return <Button variant="ghost" size="icon" aria-hidden className="opacity-0" />

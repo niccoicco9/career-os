@@ -2,7 +2,6 @@ import Link from 'next/link'
 import { ArrowRight, BarChart3, Brain, CheckCircle, Briefcase } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
 
 const features = [
   {

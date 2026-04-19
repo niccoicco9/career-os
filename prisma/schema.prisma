@@ -65,7 +65,7 @@ model Application {
 
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   jobPosting JobPosting @relation(fields: [jobPostingId], references: [id], onDelete: Cascade)
-  resume     Resume?    @relation(fields: [resumeId], references: [id])
+  resume     Resume?    @relation(fields: [resumeId], references: [id], onDelete: SetNull)
   notes      Note[]
 
   @@index([userId])
