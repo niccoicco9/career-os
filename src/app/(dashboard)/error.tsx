@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { logger } from '@/lib/logger'
 
 export default function DashboardError({
   error,
@@ -11,7 +12,7 @@ export default function DashboardError({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error('[dashboard error]', error)
+    logger.error('dashboard.boundary', { err: error, digest: error.digest })
   }, [error])
 
   const isDev = process.env.NODE_ENV === 'development'

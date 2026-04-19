@@ -18,6 +18,7 @@ import {
 } from '@/lib/constants'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { parseJsonResponse } from '@/lib/ai'
+import { logger } from '@/lib/logger'
 
 const aiAnalysisSchema = z.object({
   skills: z.array(z.string()).default([]),
@@ -128,7 +129,7 @@ export async function uploadResume(formData: FormData): Promise<{ aiError: strin
     analysis = { ...ai, extractedText: pdfText }
   } catch (err) {
     aiError = err instanceof Error ? err.message : 'Errore analisi AI'
-    console.error('[uploadResume] AI analysis failed:', aiError)
+    logger.error('uploadResume.ai_analysis_failed', { userId: user.id, err })
   }
 
   const previousResumes = await prisma.$transaction(async (tx) => {
@@ -159,7 +160,10 @@ export async function uploadResume(formData: FormData): Promise<{ aiError: strin
       .from('resumes')
       .remove(previousResumes.map((r) => r.fileUrl))
     if (removeError) {
-      console.error('[uploadResume] storage cleanup failed:', removeError.message)
+      logger.error('uploadResume.storage_cleanup_failed', {
+        userId: user.id,
+        message: removeError.message,
+      })
     }
   }
 
