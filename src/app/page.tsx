@@ -145,7 +145,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="border-t border-border py-6 text-center text-sm text-muted-foreground">
-        CareerOS — Costruito con Next.js, Supabase e Groq (Llama 3.1)
+        CareerOS — Costruito con Next.js, Supabase e Mistral
       </footer>
     </div>
   )
